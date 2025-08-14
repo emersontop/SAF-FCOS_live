@@ -48,24 +48,36 @@ def extract(data_dir, out_dir):
     """merge detection results and convert results to COCO"""
 
     # Load mini dataset, and dataset, the mini dataset is used as test and valid dataset
-    nusc_mini = NuScenes(version='v1.0-mini', dataroot=data_dir, verbose=True)
+    #nusc_mini = NuScenes(version='v1.0-mini', dataroot=data_dir, verbose=True)
     nusc = NuScenes(version='v1.0-trainval', dataroot=data_dir, verbose=True)
-    sample_files_mini = [s['filename'] for s in nusc_mini.sample_data if (s['channel'] == 'CAM_FRONT') and
-                         s['is_key_frame']]
+    
+    # Note: The mini dataset is not used in this script, but you can uncomment the following lines if needed.
+    #sample_files_mini = [s['filename'] for s in nusc_mini.sample_data if (s['channel'] == 'CAM_FRONT') and
+    #                     s['is_key_frame']]
+
+    # get all sample files from the dataset, the sample are the path to files
     sample_files = [s['filename'] for s in nusc.sample_data if (s['channel'] == 'CAM_FRONT') and
                     s['is_key_frame']]
-    sample_files_mini = set(sample_files_mini)
+    
+    # Note: The mini dataset is not used in this script, but you can uncomment the following lines if needed.
+    #sample_files_mini = set(sample_files_mini)
+    
+    sample_files_mini = set()
     sample_files = set(sample_files)
 
-    # Filter dataset items, ensure the mini dataset and dataset are not cross
+    # Filter dataset items, ensure the mini dataset and dataset are not cross, in this case, the mini dataset is not used
     tmp_sample_files = []
     for item in sample_files:
         if item not in sample_files_mini:
             tmp_sample_files.append(item)
         else:
             continue
+    
+    breakpoint()
 
     train_sample_files = tmp_sample_files
+
+    # Note: The mini dataset is not used in this script, but you can uncomment the following lines if needed.
     tv_sample_files = sample_files_mini
 
     with open(os.path.join(data_dir, 'v1.0-trainval', 'image_pc_annotations.json'), 'r') as f:
@@ -127,6 +139,12 @@ def extract(data_dir, out_dir):
 
             norm_param['pc_im_means'] = [item for item in pc_im_means]
             norm_param['pc_im_stds'] = [item for item in pc_im_stds]
+
+            norm_info_dir = os.path.join(out_dir, 'norm_info')
+            
+            if not os.path.isdir(norm_info_dir):
+                os.makedirs(norm_info_dir)
+            
             with open(os.path.join(out_dir, 'norm_info', 'norm_param_' + json_name % (data_set, radius)),
                       'w') as outfile:
                 outfile.write(json.dumps(norm_param))

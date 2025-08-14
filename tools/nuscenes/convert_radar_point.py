@@ -19,6 +19,7 @@ import sys
 from collections import OrderedDict
 from concurrent import futures
 from typing import List, Tuple, Union
+import shutil
 
 import cv2
 import numpy as np
@@ -89,16 +90,17 @@ def post_process_coords(corner_coords: List,
 
 def map_point_cloud_to_image(point_sensor_token, camera_token, min_dist=1.0):
     """
-    Given a point sensor (lidar/radar) token and camera sample_data token, load point-cloud and map it to the image
-    plane.
-    :param point_sensor_token: Lidar/radar sample_data token.
-    :param camera_token: Camera sample_data token.
-    :param min_dist: Distance from the camera below which points are discarded.
-    :return (pointcloud <np.float: 2, n)>.
+        Given a point sensor (lidar/radar) token and camera sample_data token, load point-cloud and map it to the image
+        plane.
+        :param point_sensor_token: Lidar/radar sample_data token.
+        :param camera_token: Camera sample_data token.
+        :param min_dist: Distance from the camera below which points are discarded.
+        :return (pointcloud <np.float: 2, n)>.
     """
     cam = nusc.get('sample_data', camera_token)
     point_sensor = nusc.get('sample_data', point_sensor_token)
     pcl_path = os.path.join(nusc.dataroot, point_sensor['filename'])
+    
     if point_sensor['sensor_modality'] == 'lidar':
         pc = LidarPointCloud.from_file(pcl_path)
     else:
@@ -240,8 +242,8 @@ def generate_record(ann_rec: dict,
 
 def get_pc_info(sample_data_token):
     """
-    Get the 2D annotation records for a given `sample_data_token`.
-    :param sample_data_token: Sample data token belonging to a keyframe.
+        Get the 2D annotation records for a given `sample_data_token`.
+        :param sample_data_token: Sample data token belonging to a keyframe.
     """
 
     # Get the sample data and the sample corresponding to that sample data.
@@ -251,17 +253,21 @@ def get_pc_info(sample_data_token):
         raise ValueError('The 2D re-projections are available only for keyframes.')
 
     s_rec = nusc.get('sample', sd_rec['sample_token'])
-
     point_sensor_token = s_rec['data']['RADAR_FRONT']
     pc_rec = nusc.get('sample_data', point_sensor_token)
+
     pcd_path = os.path.join(nusc.dataroot, pc_rec['filename'].replace('samples', 'pc'))
     pcd_dir = os.path.dirname(pcd_path)
+    
+    # note:
     if not os.path.isdir(pcd_dir):
         os.makedirs(pcd_dir)
 
     if not os.path.isfile(pcd_path):
+
         # Get sparse point cloud image and save it
         pc = map_point_cloud_to_image(point_sensor_token, sample_data_token)
+
         with open(pcd_path, 'w') as f:
             for i in range(pc.shape[0]):
                 line_info = pc[i, :]
@@ -269,13 +275,20 @@ def get_pc_info(sample_data_token):
                 line_info = ['%.3f' % item for item in line_info]
                 line_info = ' '.join(line_info)
                 f.write(line_info + '\n')
+    
+    # breakpoint()
 
     cam_front_json_path = os.path.join(nusc.dataroot,
                                        sd_rec['filename'].replace('samples', 'json').replace('jpg', 'json'))
+    
     cam_front_json_dir = os.path.dirname(cam_front_json_path)
+    
+    # if the directory does not exist, create it
     if not os.path.isdir(cam_front_json_dir):
         os.makedirs(cam_front_json_dir)
 
+    # breakpoint()
+    # if the json file already exists, skip the conversion
     if not os.path.isfile(cam_front_json_path):
         # Get the calibrated sensor and ego pose record to get the transformation matrices.
         cs_rec = nusc.get('calibrated_sensor', sd_rec['calibrated_sensor_token'])
@@ -356,45 +369,66 @@ def convert_pcd_file(sample_data_token, radius):
         draw_pc_image(pc, save_path, radius)
 
 
-def run():
-    # Get tokens for all camera images.
+def run(args: argparse.Namespace) -> None:
+    """
+    
+        Run the conversion of radar point cloud to 2D images.
+        params:
+            args: Command line arguments.
+    """
+    # breakpoint()
+    
+    # Get tokens for all camera images. We only use the front camera images.
     sample_data_camera_tokens = [s['token'] for s in nusc.sample_data if (s['channel'] == 'CAM_FRONT') and
-                                 s['is_key_frame']]
+                                 (s['is_key_frame'])]
 
+    # breakpoint()
     # Loop through the records and get front radar point pc info by Multi Thread.
     print("Generating 2D re-projections of the nuScenes dataset")
-    num_threads = CPU_COUNT
-    num_tokens = len(sample_data_camera_tokens)
-    with futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-        fs = [executor.submit(get_pc_info, token) for token in
-              sample_data_camera_tokens]
-        for i, f in enumerate(futures.as_completed(fs)):
-            # Write progress to error so that it can be seen
-            print_progress(i, num_tokens, prefix=nuScenes_version, suffix='Done ', bar_length=40)
 
-    # # If you do not want to use multi thread, comment the multi thread code, and uncomment the below code
-    # for token in tqdm.tqdm(sample_data_camera_tokens):
-    #     get_pc_info(token)
-
-    # Convert radar point as image and save every radar image norm info as json file
-    print("Generating 2D radar image by depth vx vy")
-    num_threads = CPU_COUNT
-    num_tokens = len(sample_data_camera_tokens)
-    for radius in radius_list:
+    if (args.multi_thread):
+        print("Using multi-threading to speed up the process")
+        num_threads = CPU_COUNT
+        num_tokens = len(sample_data_camera_tokens)
         with futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-            fs = [executor.submit(convert_pcd_file, token, radius) for token in
-                  sample_data_camera_tokens]
+            fs = [executor.submit(get_pc_info, token) for token in
+                sample_data_camera_tokens]
             for i, f in enumerate(futures.as_completed(fs)):
                 # Write progress to error so that it can be seen
                 print_progress(i, num_tokens, prefix=nuScenes_version, suffix='Done ', bar_length=40)
+    else:
+        print("Using single thread to process the data")
+        for token in tqdm.tqdm(sample_data_camera_tokens):
+            get_pc_info(token)
+    
+    # Convert radar point as image and save every radar image norm info as json file using threading
+    print("Generating 2D radar image by depth vx vy")
+
+    if (args.multi_thread):
+        print("Using multi-threading to speed up the process")  
+        num_threads = CPU_COUNT
+        num_tokens = len(sample_data_camera_tokens)
+        for radius in radius_list:
+            with futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
+                fs = [executor.submit(convert_pcd_file, token, radius) for token in
+                    sample_data_camera_tokens]
+                for i, f in enumerate(futures.as_completed(fs)):
+                    # Write progress to error so that it can be seen
+                    print_progress(i, num_tokens, prefix=nuScenes_version, suffix='Done ', bar_length=40)
+    else:
+        print("Using single thread to process the data")
+        for radius in radius_list:
+            for token in tqdm.tqdm(sample_data_camera_tokens):
+                convert_pcd_file(token, radius)
 
     # Merge all CAM_FRONT annos as a single json file
     if not os.path.isfile(os.path.join(nusc.dataroot, 'v1.0-trainval', 'image_pc_annotations.json')):
         # Save to a .json file.
         print("Combine the individual json files")
-        dest_path = os.path.join(nusc.dataroot, args.version)
-        if not os.path.exists(dest_path):
-            os.makedirs(dest_path)
+        #dest_path = os.path.join(nusc.dataroot, args.version)
+        #if not os.path.exists(dest_path):
+            #os.makedirs(dest_path)
+
         with open(os.path.join(nusc.dataroot, 'v1.0-trainval', 'image_pc_annotations.json'), 'w') as fh:
             reprojections = []
             for token in sample_data_camera_tokens:
@@ -407,7 +441,7 @@ def run():
                 reprojections.append(reprojection_records)
             json.dump(reprojections, fh, sort_keys=True, indent=4)
 
-        print("Saved the 2D re-projections under {}".format(os.path.join(nusc.dataroot, args.version, args.filename)))
+        #print("Saved the 2D re-projections under {}".format(os.path.join(nusc.dataroot, args.version, args.filename)))
 
 
 if __name__ == '__main__':
@@ -415,13 +449,27 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataroot', type=str, default='/home/citybuster/Data/nuScenes/',
                         help="Path where nuScenes is saved.")
+    parser.add_argument('--multi_thread', type=bool, default=False,
+                        help="Use multi-threading to speed up the process.")
+    parser.add_argument('--rebuild', type=bool, default=False,
+                        help="Rebuild the 2D re-projections, even if they already exist.")
     args = parser.parse_args()
+    
+    # breakpoint()
     # Make dirs to save pc info, which is extracted from pcd file of front radar
-    if not os.path.exists(os.path.join(args.dataroot, 'pc')):
-        os.makedirs(os.path.join(args.dataroot, 'pc', 'RADAR_FRONT'))
+    dir_save_pc_info = os.path.join(args.dataroot, 'pc', 'RADAR_FRONT')
+    if os.path.exists(dir_save_pc_info):
+        if args.rebuild:
+            shutil.rmtree(dir_save_pc_info)
+            os.makedirs(dir_save_pc_info)
+    else:
+        os.makedirs(dir_save_pc_info)
 
-    nuScenes_sets = ['v1.0-test', 'v1.0-trainval']
+    # parameters
+    nuScenes_sets = ['v1.0-trainval']
     radius_list = [1, 3, 5, 7, 9, 11]
+
+    # Loop through the nuScenes versions.
     for index, nuScenes_version in enumerate(nuScenes_sets):
         nusc = NuScenes(dataroot=args.dataroot, version=nuScenes_version)
-        run()
+        run(args)
