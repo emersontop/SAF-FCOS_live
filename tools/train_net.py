@@ -59,15 +59,18 @@ def train(cfg, local_rank, distributed):
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 
+    print("Starting data loading")
     data_loader = make_data_loader(
         cfg,
         is_train=True,
         is_distributed=distributed,
         start_iter=arguments["iteration"],
     )
+    print("Data loading done")
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
 
+    print("Starting training")
     do_train(
         model,
         data_loader,
@@ -125,7 +128,8 @@ def main():
     )
     parser.add_argument(
         "--norm-info-folder",
-        default="/home/citybuster/Data/nuScenes/v1.0-trainval/norm_info/",
+        #default="/home/citybuster/Data/nuScenes/v1.0-trainval/norm_info/",
+        default="/home/nuscenes/v1.0-trainval/norm_info/",
         metavar="FILE",
         help="path to config file",
         type=str,

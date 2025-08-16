@@ -145,10 +145,99 @@ def run(data_dir, out_dir):
         with open(os.path.join(out_dir, json_name % data_set), 'w') as outfile:
             outfile.write(json.dumps(ann_dict))
 
+def run2(data_dir, out_dir):
+    """merge detection results and convert results to COCO"""
+
+    # Carrega apenas o dataset trainval
+    nusc_train = NuScenes(version='v1.0-trainval', dataroot=data_dir, verbose=True)
+    sample_tokens = [s['token'] for s in nusc_train.sample_data if (s['channel'] == 'CAM_FRONT') and s['is_key_frame']]
+
+    img_id = 0
+    ann_id = 0
+    json_name = 'gt_fcos_coco_train.json'
+
+    print('Starting train')
+    ann_dict = {}
+    images = []
+    annotations = []
+    for sample_data_token in sample_tokens:
+        try:
+            sample_data = nusc_train.get('sample_data', sample_data_token)
+            sample = nusc_train.get('sample', sample_data['sample_token'])
+            point_sensor_token = sample['data']['RADAR_FRONT']
+            pc_rec = nusc_train.get('sample_data', point_sensor_token)
+        except:
+            print(sample_data_token)
+            sample_data = None
+            point_sensor_token = None
+            pc_rec = None
+        if point_sensor_token is None:
+            continue
+
+        image = dict()
+        image['id'] = img_id
+        img_id += 1
+
+        image['width'] = 1600
+        image['height'] = 900
+        image['file_name'] = sample_data['filename']
+        image['pc_file_name'] = pc_rec['filename'].replace('samples', 'imagepc').replace('pcd', 'png')
+
+        pc_image_path = os.path.join(data_dir, image['pc_file_name'].replace('imagepc', 'imagepc_01'))
+        if not os.path.isfile(pc_image_path):
+            print(pc_image_path)
+        images.append(image)
+        try:
+            with open(os.path.join(data_dir, image['file_name'].replace('samples', 'fcos').replace('jpg', 'txt')), 'r') as f:
+                detection_list = f.readlines()
+                if len(detection_list) > 0:
+                    pc = np.loadtxt(os.path.join(data_dir, pc_rec['filename'].replace('samples', 'pc')))
+                    if len(pc.shape) == 1:
+                        if pc.shape[0] == 0:
+                            continue
+                        else:
+                            pc = np.expand_dims(pc, axis=1)
+                    for line_str in detection_list:
+                        line_str = line_str.strip('\n').strip('\t')
+                        line_str = line_str.split(',')
+                        line_gt = [float(x) for x in line_str]
+                        xyxy_box = line_gt[1:]
+                        legal_box = False
+                        for pc_index in range(pc.shape[1]):
+                            point = pc[:, pc_index]
+                            if (point[0] > xyxy_box[0]) and (point[0] < xyxy_box[2]) and (
+                                    point[1] > xyxy_box[1]) and (point[1] < xyxy_box[3]):
+                                legal_box = True
+                                break
+                        ann = dict()
+                        ann['legal'] = legal_box
+                        ann['id'] = ann_id
+                        ann_id += 1
+                        ann['image_id'] = image['id']
+                        ann['category_id'] = 1
+                        ann['iscrowd'] = 0
+                        xywh_box = xyxy_to_xywh(xyxy_box)
+                        ann['bbox'] = xywh_box
+                        ann['area'] = xywh_box[2] * xywh_box[3]
+                        ann['segmentation'] = xyxy_to_polygn(xyxy_box)
+                        annotations.append(ann)
+        except FileNotFoundError:
+            print("File not found for image: %s" % image['file_name'])
+            continue
+
+    categories = [{"id": 1, "name": 'vehicle'}]
+    ann_dict['images'] = images
+    ann_dict['categories'] = categories
+    ann_dict['annotations'] = annotations
+    print("Num categories: %s" % len(categories))
+    print("Num images: %s" % len(images))
+    print("Num annotations: %s" % len(annotations))
+    with open(os.path.join(out_dir, json_name), 'w') as outfile:
+        outfile.write(json.dumps(ann_dict))
 
 if __name__ == '__main__':
     args = parse_args()
     if args.dataset == "nuscenes":
-        run(args.datadir, args.outdir)
+        run2(args.datadir, args.outdir)
     else:
         print("Dataset not supported: %s" % args.dataset)
