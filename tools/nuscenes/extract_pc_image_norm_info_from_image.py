@@ -15,9 +15,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Convert dataset')
     parser.add_argument('--dataset', help="convert dataset to coco-style", default='nuscenes', type=str)
     parser.add_argument('--datadir', help="data dir for annotations to be converted",
-                        default='/home/citybuster/Data/nuScenes', type=str)
+                        default='/home/nuscenes', type=str)
     parser.add_argument('--outdir', help="output dir for json files",
-                        default='/home/citybuster/Data/nuScenes/v1.0-trainval', type=str)
+                        default='/home/nuscenes/v1.0-mini', type=str)
+    parser.add_argument('--version', help="dataset version", default='v1.0-mini', type=str)
 
     return parser.parse_args()
 
@@ -44,12 +45,12 @@ def calculate_mean_std_of_img(img):
     return means, stds
 
 
-def extract(data_dir, out_dir):
+def extract(data_dir, out_dir, version):
     """merge detection results and convert results to COCO"""
 
     # Load mini dataset, and dataset, the mini dataset is used as test and valid dataset
     #nusc_mini = NuScenes(version='v1.0-mini', dataroot=data_dir, verbose=True)
-    nusc = NuScenes(version='v1.0-trainval', dataroot=data_dir, verbose=True)
+    nusc = NuScenes(version=version, dataroot=data_dir, verbose=True)
     
     # Note: The mini dataset is not used in this script, but you can uncomment the following lines if needed.
     #sample_files_mini = [s['filename'] for s in nusc_mini.sample_data if (s['channel'] == 'CAM_FRONT') and
@@ -73,14 +74,14 @@ def extract(data_dir, out_dir):
         else:
             continue
     
-    breakpoint()
+    # breakpoint()
 
     train_sample_files = tmp_sample_files
 
     # Note: The mini dataset is not used in this script, but you can uncomment the following lines if needed.
     tv_sample_files = sample_files_mini
 
-    with open(os.path.join(data_dir, 'v1.0-trainval', 'image_pc_annotations.json'), 'r') as f:
+    with open(os.path.join(data_dir, version, 'image_pc_annotations.json'), 'r') as f:
         sample_labels = json.load(f)
 
     train_annos = list()
@@ -153,6 +154,6 @@ def extract(data_dir, out_dir):
 if __name__ == '__main__':
     args = parse_args()
     if args.dataset == "nuscenes":
-        extract(args.datadir, args.outdir)
+        extract(args.datadir, args.outdir, args.version)
     else:
         print("Dataset not supported: %s" % args.dataset)

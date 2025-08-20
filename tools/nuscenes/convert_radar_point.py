@@ -422,14 +422,14 @@ def run(args: argparse.Namespace) -> None:
                 convert_pcd_file(token, radius)
 
     # Merge all CAM_FRONT annos as a single json file
-    if not os.path.isfile(os.path.join(nusc.dataroot, 'v1.0-trainval', 'image_pc_annotations.json')):
+    if not os.path.isfile(os.path.join(nusc.dataroot, args.version, 'image_pc_annotations.json')):
         # Save to a .json file.
         print("Combine the individual json files")
         #dest_path = os.path.join(nusc.dataroot, args.version)
         #if not os.path.exists(dest_path):
             #os.makedirs(dest_path)
 
-        with open(os.path.join(nusc.dataroot, 'v1.0-trainval', 'image_pc_annotations.json'), 'w') as fh:
+        with open(os.path.join(nusc.dataroot, args.version, 'image_pc_annotations.json'), 'w') as fh:
             reprojections = []
             for token in sample_data_camera_tokens:
                 # Get the sample data and the sample corresponding to that sample data.
@@ -447,15 +447,17 @@ def run(args: argparse.Namespace) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert radar point',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--dataroot', type=str, default='/home/citybuster/Data/nuScenes/',
+    parser.add_argument('--dataroot', type=str, default='/home/nuscenes/',
                         help="Path where nuScenes is saved.")
-    parser.add_argument('--multi_thread', type=bool, default=False,
+    parser.add_argument('--multi_thread', type=bool,
                         help="Use multi-threading to speed up the process.")
-    parser.add_argument('--rebuild', type=bool, default=False,
+    parser.add_argument('--rebuild', type=bool,
                         help="Rebuild the 2D re-projections, even if they already exist.")
+    parser.add_argument('--version', type=str, default='v1.0-mini',
+                        help="Version of nuScenes to use. Options: 'v1.0-trainval', 'v1.0-mini'.")
     args = parser.parse_args()
     
-    # breakpoint()
+    #breakpoint()
     # Make dirs to save pc info, which is extracted from pcd file of front radar
     dir_save_pc_info = os.path.join(args.dataroot, 'pc', 'RADAR_FRONT')
     if os.path.exists(dir_save_pc_info):
@@ -466,7 +468,7 @@ if __name__ == '__main__':
         os.makedirs(dir_save_pc_info)
 
     # parameters
-    nuScenes_sets = ['v1.0-trainval']
+    nuScenes_sets = [args.version]
     radius_list = [1, 3, 5, 7, 9, 11]
 
     # Loop through the nuScenes versions.

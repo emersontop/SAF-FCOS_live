@@ -4,7 +4,7 @@
 set -e
 
 NUSCENES_MINI_URL="https://www.nuscenes.org/data/v1.0-mini.tgz"
-OUTPUT_DIR="/root/code/nuscenes"
+OUTPUT_DIR="/home/nuscenes"
 
 echo "Criando diretório de saída: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"

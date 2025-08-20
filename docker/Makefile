@@ -20,7 +20,6 @@ docker-run:
 		-e DISPLAY=$(DISPLAY) \
 		--network host \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v /media/live-segcom/nuscenes:/home/nuscenes \
 		$(IMAGE_NAME)
 
 # Regra para iniciar o container Docker
