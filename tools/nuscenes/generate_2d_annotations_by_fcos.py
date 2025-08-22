@@ -12,9 +12,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Convert dataset')
     parser.add_argument('--dataset', help="convert dataset to coco-style", default='nuscenes', type=str)
     parser.add_argument('--datadir', help="data dir for annotations to be converted",
-                        default='/home/citybuster/Data/nuScenes', type=str)
+                        default='/home/nuscenes', type=str)
     parser.add_argument('--outdir', help="output dir for json files",
-                        default='/home/citybuster/Data/nuScenes/v1.0-trainval', type=str)
+                        default='/home/nuscenes/v1.0-mini', type=str)
+    parser.add_argument('--version', help="dataset version", default='v1.0-mini', type=str)
 
     return parser.parse_args()
 
@@ -145,11 +146,11 @@ def run(data_dir, out_dir):
         with open(os.path.join(out_dir, json_name % data_set), 'w') as outfile:
             outfile.write(json.dumps(ann_dict))
 
-def run2(data_dir, out_dir):
+def run2(data_dir, out_dir, version):
     """merge detection results and convert results to COCO"""
 
     # Carrega apenas o dataset trainval
-    nusc_train = NuScenes(version='v1.0-trainval', dataroot=data_dir, verbose=True)
+    nusc_train = NuScenes(version=version, dataroot=data_dir, verbose=True)
     sample_tokens = [s['token'] for s in nusc_train.sample_data if (s['channel'] == 'CAM_FRONT') and s['is_key_frame']]
 
     img_id = 0
@@ -187,8 +188,9 @@ def run2(data_dir, out_dir):
         if not os.path.isfile(pc_image_path):
             print(pc_image_path)
         images.append(image)
+        path_complete = os.path.join(data_dir, image['file_name'].replace('samples', 'fcos').replace('jpg', 'txt'))
         try:
-            with open(os.path.join(data_dir, image['file_name'].replace('samples', 'fcos').replace('jpg', 'txt')), 'r') as f:
+            with open(path_complete, 'r') as f:
                 detection_list = f.readlines()
                 if len(detection_list) > 0:
                     pc = np.loadtxt(os.path.join(data_dir, pc_rec['filename'].replace('samples', 'pc')))
@@ -222,7 +224,7 @@ def run2(data_dir, out_dir):
                         ann['segmentation'] = xyxy_to_polygn(xyxy_box)
                         annotations.append(ann)
         except FileNotFoundError:
-            print("File not found for image: %s" % image['file_name'])
+            print("File not found for image: %s" % path_complete)
             continue
 
     categories = [{"id": 1, "name": 'vehicle'}]
@@ -238,6 +240,6 @@ def run2(data_dir, out_dir):
 if __name__ == '__main__':
     args = parse_args()
     if args.dataset == "nuscenes":
-        run2(args.datadir, args.outdir)
+        run2(args.datadir, args.outdir, args.version)
     else:
         print("Dataset not supported: %s" % args.dataset)

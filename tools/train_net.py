@@ -28,24 +28,36 @@ from fcos_core.utils.miscellaneous import mkdir
 
 
 def train(cfg, local_rank, distributed):
+    print("Building model...")
     model = build_detection_model(cfg)
+    print("Model:\n{}".format(model))
     device = torch.device(cfg.MODEL.DEVICE)
+    print("Moving model to device...")
     model.to(device)
+    print("Model moved to device")
 
     if cfg.MODEL.USE_SYNCBN:
         assert is_pytorch_1_1_0_or_later(), \
             "SyncBatchNorm is only available in pytorch >= 1.1.0"
+        print("Converting model to use SyncBatchNorm...")
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        print("Converted model to use SyncBatchNorm")
 
+    print("Building optimizer...")
     optimizer = make_optimizer(cfg, model)
+    print("Optimizer:\n{}".format(optimizer))
+    print("Building learning rate scheduler...")
     scheduler = make_lr_scheduler(cfg, optimizer)
+    print("Learning rate scheduler:\n{}".format(scheduler))
 
     if distributed:
+        print("Wrapping model with DistributedDataParallel...")
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[local_rank], output_device=local_rank,
             # this should be removed if we update BatchNorm stats
             broadcast_buffers=False,
         )
+        print("Wrapped model with DistributedDataParallel")
 
     arguments = {}
     arguments["iteration"] = 0
@@ -129,7 +141,7 @@ def main():
     parser.add_argument(
         "--norm-info-folder",
         #default="/home/citybuster/Data/nuScenes/v1.0-trainval/norm_info/",
-        default="/home/nuscenes/v1.0-trainval/norm_info/",
+        default="/home/nuscenes/v1.0-mini/norm_info/",
         metavar="FILE",
         help="path to config file",
         type=str,
@@ -191,10 +203,13 @@ def main():
     logger.info("Loaded configuration file {}".format(args.config_file))
     with open(args.config_file, "r") as cf:
         config_str = "\n" + cf.read()
+        logger.info("Contents of config file:")
         logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
+    logger.info("Before train() call")
     model = train(cfg, args.local_rank, args.distributed)
+    logger.info("After train() call")
 
     if not args.skip_test:
         run_test(cfg, model, args.distributed)

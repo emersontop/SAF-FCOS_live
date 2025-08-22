@@ -8,15 +8,15 @@ class DatasetCatalog(object):
     DATASETS = {
         "nuscenes_train_cocostyle": {
             "img_dir": "/home/nuscenes",
-            "ann_file": "/home/nuscenes/v1.0-trainval/gt_fcos_coco_train.json"
+            "ann_file": "/home/nuscenes/v1.0-mini/gt_fcos_coco_train.json"
         },
         "nuscenes_val_cocostyle": {
             "img_dir": "/home/nuscenes",
-            "ann_file": "/home/nuscenes/v1.0-trainval/gt_fcos_coco_val.json"
+            "ann_file": "/home/nuscenes/v1.0-mini/gt_fcos_coco_val.json"
         },
         "nuscenes_test_cocostyle": {
             "img_dir": "/home/nuscenes",
-            "ann_file": "/home/nuscenes/v1.0-trainval/gt_fcos_coco_val.json"
+            "ann_file": "/home/nuscenes/v1.0-mini/gt_fcos_coco_val.json"
         }
     }
 
