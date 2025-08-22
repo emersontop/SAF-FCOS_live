@@ -1,6 +1,6 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #pragma once
-#include "/FCOS_live/fcos_core/csrc/cpu/vision.h"
+#include "cpu/vision.h"
 
 #ifdef WITH_CUDA
 #include "cuda/vision.h"
@@ -11,7 +11,7 @@ at::Tensor nms(const at::Tensor& dets,
                const at::Tensor& scores,
                const float threshold) {
 
-  if (dets.is_cuda()) {
+  if (dets.type().is_cuda()) {
 #ifdef WITH_CUDA
     // TODO raise error if not compiled with CUDA
     if (dets.numel() == 0)

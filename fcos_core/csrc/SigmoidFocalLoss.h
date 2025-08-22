@@ -1,6 +1,6 @@
 #pragma once
 
-#include "/FCOS_live/fcos_core/csrc/cpu/vision.h"
+#include "cpu/vision.h"
 
 #ifdef WITH_CUDA
 #include "cuda/vision.h"
@@ -13,7 +13,7 @@ at::Tensor SigmoidFocalLoss_forward(
 		const int num_classes, 
 		const float gamma, 
 		const float alpha) {
-  if (logits.is_cuda()) {
+  if (logits.type().is_cuda()) {
 #ifdef WITH_CUDA
     return SigmoidFocalLoss_forward_cuda(logits, targets, num_classes, gamma, alpha);
 #else
@@ -30,7 +30,7 @@ at::Tensor SigmoidFocalLoss_backward(
 			     const int num_classes,
 			     const float gamma,
 			     const float alpha) {
-  if (logits.is_cuda()) {
+  if (logits.type().is_cuda()) {
 #ifdef WITH_CUDA
     return SigmoidFocalLoss_backward_cuda(logits, targets, d_losses, num_classes, gamma, alpha);
 #else

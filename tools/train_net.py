@@ -26,6 +26,7 @@ from fcos_core.utils.env import setup_environment  # noqa F401 isort:skip
 from fcos_core.utils.logger import setup_logger
 from fcos_core.utils.miscellaneous import mkdir
 
+torch.backends.cudnn.enabled = False
 
 def train(cfg, local_rank, distributed):
     print("Building model...")
